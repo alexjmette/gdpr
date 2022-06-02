@@ -1,0 +1,54 @@
+public class LeadTriggerHandler {
+    Map<Id, Lead> oldLeadsMap;
+  	Map<Id, Lead> newLeadsMap;
+    List<Lead> oldLeadsList;
+    List<Lead> newLeadsList;
+    
+    //constructor for before insert
+    public LeadTriggerHandler (
+    	List<Lead> newTriggerLeadsList) {
+            newLeadsList = newTriggerLeadsList;
+        } 
+    
+    //constructor for before update
+    public LeadTriggerHandler (
+   	  Map<Id, Lead> oldTriggerLeadsMap,
+      Map<Id, Lead> newTriggerLeadsMap,
+      List<Lead> newTriggerLeadsList) {
+            oldLeadsMap = oldTriggerLeadsMap;
+            newLeadsMap = newTriggerLeadsMap;
+          	newLeadsList = newTriggerLeadsList;
+        }  
+    
+    public void beforeInsert() {
+        
+		 gdprGeography.leadGDPR(newLeadsList);
+        
+    } //end of method
+    
+    public void beforeUpdate () {
+        
+        //if the lead country or email is changing
+        //pass to the gdprGeography class to update 
+        //gdpr status and marketing consent info             
+        
+        list<lead> leadsToProcess = new list<lead>();
+        
+        for (lead newLead : newLeadsMap.values()) {
+            lead oldLead = oldLeadsMap.get(newLead.Id);
+            string oldLeadCountry = oldLead.Country;
+            string newLeadCountry = newLead.Country;
+            string oldLeadEmail = oldLead.Email;
+            string newLeadEmail = newLead.Email;
+            
+            if (oldLeadCountry != newLeadCountry ||
+               oldLeadEmail != newLeadEmail) {
+                leadsToProcess.add(newLead);
+            }
+        }
+        
+        gdprGeography.leadGDPR(leadsToProcess);
+        
+    } //end of method
+
+}
