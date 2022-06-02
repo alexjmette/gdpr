@@ -1,0 +1,134 @@
+public class gdprGeography {    
+    
+    /* contains methods for retrieving custom metadata for data privacy
+     * including whether a lead/contact is covered by GDPR, based on their address,
+     * and what their country requires for unsolicited marketing
+	*/	
+    
+    public static list<Country__mdt> getGDPRList(){
+        return [SELECT 
+                MasterLabel, 
+                ccTLD__c, 
+                GDPR__c, 
+                Marketing_Consent_Required__c
+                FROM Country__mdt
+                WHERE GDPR__c = TRUE];
+    }
+    
+    public static map<String, Country__mdt> getGDPRCountryMap(){
+        
+        list<Country__mdt> gdprCountries = gdprGeography.getGDPRList();
+        map<String, Country__mdt> countryMap = new map<String, Country__mdt>();
+        
+        for (country__mdt gdprCountry : gdprCountries){
+             countryMap.put(gdprCountry.MasterLabel, gdprCountry);
+        }
+        return countryMap;      
+    }
+    
+        public static map<String, Country__mdt> getGDPRDomainMap(){
+        
+        map<String, Country__mdt> countryMap = gdprGeography.getGDPRCountryMap();    
+        map<String, Country__mdt> domainMap = new map<String, Country__mdt>();
+        
+        for (String key : countryMap.keySet()) {
+            string domain = countryMap.get(key).ccTLD__c;
+            country__mdt ctry = countryMap.get(key);
+            domainMap.put(domain, ctry);
+        }
+            
+        return domainMap;      
+    }
+    
+    public static void leadGDPR(list<lead> leadsToProcess) {
+        
+        //get the all the country mdt records where gdpr = true
+        //map of country label, country
+        //map of country top level domain, country
+        
+        map <string, country__mdt> countryMap = gdprGeography.getGDPRCountryMap();
+        map <string, country__mdt> domainMap = gdprGeography.getGDPRDomainMap();
+		
+        for (lead l : leadsToProcess) {
+            
+            //if the lead country matches the list of GDPR countries, set gdpr = true and populate the marketing consent field
+            //otherwise, check the list of GDPR countries based on the email domain
+            //if neither of those are true, they are not part of gdpr countries
+            
+		  			boolean hasCountry = countryMap.containsKey(l.Consolidated_Country__c);
+            	    string reverseEmail = l.email?.reverse();
+        			string dot = '.';
+            		integer charToDot = reverseEmail?.indexof(dot,1);
+				    string emailDom = '.'+reverseEmail?.left(charToDot)?.reverse();
+					boolean hasDomain = domainMap.containsKey(emailDom);
+            
+                      if (hasCountry == True) { 
+                          
+                          	system.debug('found the lead country: '+l.Consolidated_Country__c);
+                          
+                              l.gdpr__c = countryMap.get(l.Consolidated_Country__c).gdpr__c;
+                              l.Marketing_Consent_Required__c = countryMap.get(l.Consolidated_Country__c).Marketing_Consent_Required__c;	
+                              
+                      } 
+
+            				else if (hasDomain == True && l.Consolidated_Country__c == null) { 
+                          
+                          	system.debug('found the lead email: '+l.Email);
+                          
+                              l.gdpr__c = domainMap.get(emailDom).gdpr__c;
+                              l.Marketing_Consent_Required__c = domainMap.get(emailDom).Marketing_Consent_Required__c;
+                              
+                      } else { 
+                          
+                          system.debug('didnt find the country or email domain in the list of GDPR records');
+                              l.gdpr__c = False;
+                              l.Marketing_Consent_Required__c = null;
+                              
+                      }  
+        } //end of loop
+
+    } //end of method
+    
+    
+    public static void contactGDPR(list<contact> contactsToProcess) {
+        
+        //get the all the country mdt records where gdpr = true
+        //map of country label, country
+        //map of country top level domain, country
+        
+        map <string, country__mdt> countryMap = gdprGeography.getGDPRCountryMap();
+        map <string, country__mdt> domainMap = gdprGeography.getGDPRDomainMap();
+        
+        
+            //if the contact country matches the list of GDPR countries, set gdpr = true and populate the marketing consent field
+            //otherwise, check the list of GDPR countries based on the email domain
+            //if neither of those are true, they are not part of gdpr countries
+            
+        	for (contact c : contactsToProcess) {         
+                
+                boolean hasCountry = countryMap.containsKey(c.Consolidated_Country__c);
+            	string reverseEmail = c.email?.reverse();
+                string dot = '.';
+                integer charToDot = reverseEmail?.indexof(dot,1);
+                string emailDom = '.'+reverseEmail?.left(charToDot)?.reverse();
+                boolean hasDomain = domainMap.containsKey(emailDom);
+                      
+                if( hasCountry == True) {
+                 
+                          c.gdpr__c = countryMap.get(c.Consolidated_Country__c).gdpr__c;
+                          c.Marketing_Consent_Required__c = countryMap.get(c.Consolidated_Country__c).Marketing_Consent_Required__c;
+                    
+                      } else if (hasDomain == True && c.Consolidated_Country__c == null) {          
+                              
+                              c.gdpr__c = domainMap.get(emailDom).gdpr__c;
+                              c.Marketing_Consent_Required__c = domainMap.get(emailDom).Marketing_Consent_Required__c;
+
+                          } else {
+                              c.gdpr__c = False;
+                              c.Marketing_Consent_Required__c = null;
+                          }
+                          
+                      } //end of loop
+
+    } //end of method
+}
