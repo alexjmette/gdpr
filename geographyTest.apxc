@@ -1,0 +1,220 @@
+@isTest	
+public class gdprGeographyTest {
+
+    public static testMethod void testLeadUpdate () {
+      
+        //test data: EU lead with country and without country
+        //ex-EU lead with country and without country
+        
+        lead germanLead = new lead(
+        firstName = 'sam',
+        lastName = 'smith',
+        Company = 'smithens',
+        Country = 'Germany');
+        
+        insert germanLead;
+        
+        lead noCountryLead = new lead(
+        firstName = 'wam',
+        lastName = 'with',
+        Company = 'smithens',
+		email = 'wwith@withens.de');
+        
+        insert noCountryLead;
+        
+        lead panamaLead = new lead(
+        firstName = 'pam',
+        lastName = 'pmith',
+        Company = 'pithens',
+        Country = 'Panama');
+        
+        insert panamaLead;
+        
+        lead usDomainLead = new lead(
+        firstName = 'ham',
+        lastName = 'hammons',
+        Company = 'pithens',
+        email = 'hhammons@pithens.com');
+        
+        insert usDomainLead;
+
+        list<lead> leadsToProcess = new list<lead>();
+        leadsToProcess.add(panamaLead);
+        leadsToProcess.add(usDomainLead);
+        leadsToProcess.add(germanLead);
+        leadsToProcess.add(noCountryLead);
+        
+        //test that a lead in gdpr country and a lead with a gdpr country email domain
+        //both are flagged as gdpr leads after the method runs
+        
+        list <lead> germanLeads = [SELECT 
+                      	Id,
+                        email,
+                  		gdpr__c,
+                        Consolidated_Country__c,
+                  		Marketing_Consent_Required__c 
+                  	FROM Lead 
+                  	WHERE 
+                    Company = 'Smithens'];
+        
+        for (lead gLead : germanLeads) {
+        	system.assert(gLead.gdpr__c = true);
+        	system.assertEquals('Double Opt-in',gLead.Marketing_Consent_Required__c);
+        }
+        
+        //test that a lead in a non-gdpr country and a non-gdpr email domain
+        //are not flagged as gdpr leads after the method runs
+        
+        list <lead> panamaLeads = [SELECT 
+                      	Id,
+                        firstName,
+                        lastName,
+                        email,
+                  		gdpr__c,
+                        Consolidated_Country__c,
+                  		Marketing_Consent_Required__c 
+                  	FROM Lead 
+                  	WHERE 
+                    Company = 'pithens'];
+        
+        for (lead pLead : panamaLeads) {
+        	system.assertEquals(false, pLead.gdpr__c);
+        }
+        
+        for (lead newCountry : panamaLeads){
+            newCountry.Country = 'France';
+        }
+        
+        update panamaLeads;
+        
+        
+        for (lead newCountry1 : [SELECT Id,
+                                gdpr__c,
+                                marketing_consent_required__c,
+                                consolidated_Country__c,
+                                country
+                                FROM Lead
+                                WHERE country = 'France']){
+            system.assertEquals(True, newCountry1.gdpr__c);
+        }
+        
+        
+        
+        
+    } //end of method
+
+	
+               
+    
+    public static testMethod void testContactUpdate () {
+        
+        //set up data
+        //
+        
+        account gdprCountryAccount = new account(
+        name = 'Wendys',
+        BillingCountry = 'Norway');
+        insert gdprCountryAccount;
+        
+        account noCountry = new account(
+        name = 'Sendys');
+        insert noCountry;
+        
+        //**test case 1**
+        //contact with a gdpr country listed
+        //expect that it will be flagged
+        contact finlandContact = new contact(
+        firstName = 'will',
+        lastName = 'smith',
+        MailingCountry = 'Finland',
+        Account = gdprCountryAccount);
+        
+        insert finlandContact;
+        
+        //**test case 2**
+        //contact with a non-GDPR country listed
+        //expect that it will not be flagged
+        contact nonGDPRContact = new contact(
+        firstName = 'bill',
+        lastName = 'blith',
+        MailingCountry = 'China',
+        Email = 'bblith@wendys.org',
+        Account = gdprCountryAccount);
+        
+        insert nonGDPRContact;
+        
+        //**test case 3**
+        //contact with no country listed
+        //gdpr email
+        //expect that it will be flagged
+        contact accountGDPRCountry = new contact(
+        firstName = 'sally',
+        lastName = 'salls',
+        Email = 'sally@wendys.no',
+        Account = noCountry);
+        
+        insert accountGDPRCountry;
+        
+        //**test case 4**
+		//update contact with no country to a gdpr country
+		
+        contact noData = new contact(
+        firstName = 'Norm',
+        lastName = 'alData',
+        Account = noCountry);
+        insert noData;
+
+        //**test case 1**contact with a gdpr country listed
+        //expect that it will be flagged
+        for (contact finland : [SELECT Id, gdpr__c, accountId, marketing_consent_Required__c 
+                       FROM Contact
+                        WHERE MailingCountry = 'Finland']){
+                            system.assertEquals(true, finland.gdpr__c);
+                            system.assertEquals('Opt-out',finland.Marketing_Consent_Required__c);
+                        }
+        
+        //**test case 2**
+        //contact with a non-GDPR country listed
+        //expect that it will not be flagged
+        for (contact china : [SELECT Id, gdpr__c, marketing_consent_Required__c 
+                       FROM Contact
+                        WHERE MailingCountry = 'China']){
+                            system.assertEquals(false,china.gdpr__c);
+                            system.assertEquals(null,china.marketing_consent_Required__c);
+                        }
+        
+        //**test case 3**
+        //contact with no country listed
+        //gdpr email
+        //expect that it will be flagged
+        for (contact wendys : [SELECT Id, gdpr__c, marketing_consent_Required__c, consolidated_country__c 
+                              FROM Contact
+                              WHERE Email = 'sally@wendys.no']){
+                                  system.assertEquals(true,wendys.gdpr__c);
+                                  system.assertEquals('Opt-in',wendys.marketing_consent_Required__c);
+                              }
+        
+        //**test case 4**
+		//update contact with no country to a gdpr country
+		//
+		
+        for (contact sendys : [SELECT Id, gdpr__c, accountId, marketing_consent_required__c
+                              FROM Contact
+                               WHERE lastName = 'alData']){
+                                   system.assertEquals(false, sendys.gdpr__c);
+                               }
+        
+        noData.Email = 'n.data@nocountry.uk';
+        update noData;
+        
+        for (contact sendys1 : [SELECT Id, gdpr__c, accountId, marketing_consent_required__c
+                               FROM Contact
+                               WHERE lastName = 'alData']){
+                                   system.assertEquals(true, sendys1.gdpr__c);
+                               }
+       
+        
+     
+    }   //end of method
+    
+}
